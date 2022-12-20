@@ -1,0 +1,157 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+
+function banner() {
+    echo Distort images by pushing them through audio codecs.
+}
+
+function usage() {
+    echo Usage: img-roundtrip \[options\] filename
+}
+
+function help_text(){
+    cat << EOF
+$(banner)
+$(usage)
+
+Options:
+-b, --bitrate    bitrate used
+-c, --codec      audio codec
+-p, --pixfmt     pixel format  
+-o, --output     output prefix
+-r, --rate       sample rate
+-s, --shift      shift roundtrip audio by n bytes forwards
+-h, --help       this help
+EOF
+}
+
+# 1: input
+# 2: output
+# 3: sample rate
+function audiotou8() {
+    ffmpeg -f nut -i "$1" -f u8 -ar "$3" "$2"
+}
+
+# 1: input
+# 2: sample rate
+# 3: output
+# 4: bitrate
+# 5: codec
+function u8toaudio() {
+    ffmpeg -f u8 -ar "$2" -i "$1" -b:a "$4" -c:a "$5" -f nut "$3"
+}
+
+# 1: input
+# 2: pix_fmt
+# 3: resolution
+# 4: output
+function u8toimage() {
+    ffmpeg -pix_fmt "$2" -s "$3" -f rawvideo -i "$1" -frames:v 1 "$4" -y
+}
+
+# 1: input
+# 2: pix_fmt
+# 3: output
+function imagetorawvideo() {
+    ffmpeg -i "$1" -f rawvideo -pix_fmt "$2" "$3"
+}
+
+# 1: input 
+# 2: output
+# 3: offset
+function imageshift() {
+    ffmpeg -i "$1" -vf rgbashift=rh="$3":gh="$3":bh="$3" "$2"
+}
+
+# 1: input
+# 2: output
+# 3: shift in samples (bytes, usually)
+function audioshift(){
+    ffmpeg -i "$1" -c:a pcm_s24le -f nut -af adelay=delays="$3"S:all=1 "$2"
+}
+
+function file_notexist() {
+    cat << EOF
+$filepath: does not exist.
+EOF
+    exit 3
+}
+
+
+ARGS="$(getopt --options b:,c:,p:,o:,r:,s:,h --long bitrate:,codec:,pixfmt,output:,rate:,shift:,help -- "$@")"
+eval set -- "$ARGS"
+while true; do
+        case "$1" in
+        -b | --bitrate)
+            bitrate="$2"
+            shift 2
+            ;;
+        -c | --codec)
+            codec="$2"
+            shift 2
+            ;;
+        -p | --pixfmt)
+            pixfmt="$2"
+            shift 2
+            ;;
+        -o | --output)
+            output_prefix="$2"
+            shift 2
+            ;;
+        -r | --rate)
+            sample_rate="$2"
+            shift 2
+            ;;
+        -s | --shift)
+            offset="$2"
+            shift 2 
+            ;;
+        -h | --help)
+            help_text
+            exit 127
+            ;;
+        --)
+            set +o nounset 
+            if [[ -z "$2" ]]; then 
+                echo "No file was specified."
+                help_text
+                exit 4
+            fi
+            set -o nounset
+            filepath="$2"
+            break
+            ;;
+        *)
+            echo How did you get here?
+            exit 1
+            break
+            ;;
+    esac
+done
+
+
+if [[ ! (-e "$filepath") ]] # if the file does not exist
+then
+	file_notexist
+fi
+
+resolution="$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "$filepath")" 
+pixfmt="${pixfmt:-rgb24}"  
+sample_rate="${sample_rate:-48000}"
+offset="${offset:-0}"
+bitrate="${bitrate:-64k}"
+codec="${codec:-libopus}"
+
+filename="$(basename "$filepath")"
+base_filename="${filename%.*}"
+output_prefix="${output_prefix:-$base_filename}"
+output_filename="$output_prefix"-"$pixfmt"-"$sample_rate"-"$codec"-"$bitrate"-"$offset"
+
+imagetorawvideo "$filepath" "$pixfmt" '-' | \
+u8toaudio '-' "$sample_rate" '-' "$bitrate" "$codec" | \
+audioshift '-' '-' "$offset" | \
+audiotou8 '-' '-' "$sample_rate" | \
+u8toimage '-' "$pixfmt" "$resolution" "$output_filename".png
+
