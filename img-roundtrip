@@ -16,13 +16,14 @@ function help_text(){
 $(banner)
 $(usage)
 
+Text encased in [] are defaults.
 Options:
--b, --bitrate    bitrate used
--c, --codec      audio codec
--p, --pixfmt     pixel format  
--o, --output     output prefix
--r, --rate       sample rate
--s, --shift      shift roundtrip audio by n bytes forwards
+-b, --bitrate    bitrate used [64k]
+-c, --codec      audio codec [libopus]
+-p, --pixfmt     pixel format [rgb24]
+-o, --output     output prefix [based on filename]
+-r, --rate       sample rate [48000]
+-s, --shift      shift roundtrip audio by n bytes forwards [0]
 -h, --help       this help
 EOF
 }
