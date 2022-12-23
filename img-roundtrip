@@ -83,11 +83,11 @@ EOF
 }
 
 
-ARGS="$(getopt --options ac:,b:,c:,p:,o:,r:,s:,h --long channels:,bitrate:,codec:,pixfmt,output:,rate:,shift:,help -- "$@")"
+ARGS="$(getopt --options a,b:,c:,p:,o:,r:,s:,h --long channels:,bitrate:,codec:,pixfmt,output:,rate:,shift:,help -- "$@")"
 eval set -- "$ARGS"
 while true; do
         case "$1" in
-        -ac | --channels)
+        -a | --channels)
             channels="$2"
             shift 2
             ;;
