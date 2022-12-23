@@ -5,11 +5,11 @@ set -o nounset
 
 
 function banner() {
-    echo Distort images by pushing them through audio codecs.
+    echo Distort audio by pushing them through video codecs.
 }
 
 function usage() {
-    echo Usage: img-roundtrip \[options\] filename
+    echo Usage: audio-to-video-roundtrip \[options\] filename
 }
 
 function help_text(){
@@ -19,7 +19,13 @@ $(usage)
 
 Text encased in [] are defaults.
 Options:
--h, --help       this help
+-b, --bitrate       video bitrate [16k]
+-c, --codec         video codec [libx264]
+-p, --pixfmt        pixel format [rgb24]
+-s, --resolution    resolution [32x32]
+-M, --no-mulaw      disable mu-law
+-o, --output        output prefix
+-h, --help          this help
 EOF
 }
 
