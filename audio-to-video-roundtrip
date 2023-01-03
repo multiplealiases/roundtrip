@@ -34,23 +34,20 @@ EOF
 # 3: sample rate
 # 4: channels
 # 5: sample format
+# convert self-describing audio to a raw sample format
+# input type : audio in NUT
+# output type: raw audios
 function audiotoraw() {
     ffmpeg -hide_banner -f nut -i "$1" -f "$5" -ac "$4" -ar "$3" -vn "$2"
 }
 
 # 1: input
 # 2: output
+# converts self-describing audio to FLAC
+# input type: self-describing audio
+# output type: FLAC
 function audiotoplayable() {
     ffmpeg -i "$1" -c:a flac -y "$2"
-}
-
-# 1: input
-# 2: pixel format
-# 3: resolution
-# missing: framerate
-# 4: output
-function audiotorawvideo() {
-    ffmpeg -hide_banner -f nut -i "$1" -f rawvideo -pix_fmt "$2" -s "$3" "$4"
 }
 
 # 1: input
@@ -60,12 +57,18 @@ function audiotorawvideo() {
 # 5: output
 # 6: video codec
 # 7: video bitrate
+# converts rawvideo to self-describing video in NUT
+# input type : rawvideo
+# output type: video in NUT
 function rawvideotovideo() {
     ffmpeg -hide_banner -f rawvideo -pix_fmt "$2" -s "$3" -framerate "$4" -i "$1" -c:v "$6" -b:v "$7" -f nut "$5" 
 }
 
 # 1: input
 # 2: output
+# wraps self-describing media in the NUT container format
+# input type : self-describing media
+# output type: self-describing media in NUT
 function wraptonut() {
     ffmpeg -hide_banner -i "$1" -c copy -f nut "$2"
 }
@@ -73,6 +76,9 @@ function wraptonut() {
 # 1: input
 # 2: output
 # 3: pixel format
+# converts video to rawvideo
+# input type: self-describing video in NUT
+# output type: rawvideo
 function videotorawvideo() {
     ffmpeg -hide_banner -f nut -i "$1" -f rawvideo -pix_fmt "$3" "$2"
 }
@@ -81,6 +87,9 @@ function videotorawvideo() {
 # 2: channels
 # 3: sample rate
 # 4: output
+# applies the expand half of the mu-law algorithm 
+# input type: s32le
+# output type: u8
 function mulawexpand() {
     sox --guard --no-dither --show-progress \
         --channels "$2" --type u8  --rate "$3" "$1" \
@@ -92,6 +101,9 @@ function mulawexpand() {
 # 2: channels
 # 3: sample rate
 # 4: output
+# applies the compress half of the mu-law algorithm 
+# input type: u8
+# output type: s32le
 function mulawcompress() {
     sox --guard --no-dither --show-progress \
         --type s32 --rate "$3" --channels "$2" "$1" \
@@ -106,6 +118,9 @@ function mulawcompress() {
 # 5: output
 # 6: bitrate
 # 7: codec
+# converts raw data to audio of an arbitrary codec
+# input type: raw (read as $'sample format' audio)
+# output type: self-describing audio in NUT
 function rawtoaudio() {
     ffmpeg -hide_banner -f "$4" -ar "$2" -ac "$3" -i "$1" -b:a "$6" -c:a "$7" -f nut "$5" -y
 }
