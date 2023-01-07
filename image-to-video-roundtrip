@@ -1,0 +1,197 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+
+function banner() {
+    echo Distort images by pushing them through video codecs.
+}
+
+function usage() {
+    echo Usage: image-to-video-roundtrip \[options\] filename
+}
+
+function help_text(){
+    cat << EOF
+$(banner)
+$(usage)
+
+Text encased in [] are defaults.
+Video options:
+-c, --codec        codec [libx264]
+-b, --bitrate      bitrate [16k]
+-p, --pixfmt       pixel format [rgb24]
+-s, --size         resolution [32x32]
+-r, --framerate    framerate [30]
+Input/output options:
+-I, --stdin        input is standard input
+-O, --stdout       output is standard output
+Other options:
+-o, --output       output prefix (overriden by -O)
+-h, --help         this help
+EOF
+}
+
+function file_notexist() {
+    printf ''\''%s'\'': file does not exist\n' "$1"
+    exit 3
+}
+
+function file_none() {
+    echo No file was specified.
+    help_text
+    exit 4
+}
+
+# 1: input
+# 2: output
+# 3: pixel format
+# converts video to rawvideo
+# input type: self-describing video in NUT
+# output type: rawvideo
+function videotorawvideo() {
+    ffmpeg -hide_banner -f nut -i "$1" -f rawvideo -pix_fmt "$3" "$2" -y
+}
+
+# 1: input
+# 2: pixel format
+# 3: resolution
+# 4: framerate
+# 5: output
+# 6: video codec
+# 7: video bitrate
+# converts rawvideo to self-describing video in NUT
+# input type : rawvideo
+# output type: video in NUT
+function rawvideotovideo() {
+    ffmpeg -hide_banner -f rawvideo -pix_fmt "$2" -s "$3" -framerate "$4" -i "$1" -c:v "$6" -b:v "$7" -f nut "$5" 
+}
+
+# 1: input
+# 2: pixel format
+# 3: resolution
+# 4: output
+# converts rawvideo to PNG
+# input type : rawvideo
+# output type: 1 PNG frame
+function rawvideotopng() {
+    ffmpeg -hide_banner -f rawvideo -pix_fmt "$2" -s "$3" -i "$1" -frames:v 1 "$4" -y
+}
+
+# 1: input
+# 2: output
+# wraps self-describing media in the NUT container format
+# input type : self-describing media
+# output type: self-describing media in NUT
+function wraptonut() {
+    ffmpeg -hide_banner -i "$1" -c copy -f nut "$2"
+}
+
+ARGS="$(getopt --options s:,o:,O,I,p:,c:,b:,r:,h --long output:,stdin,stdout,pixfmt:,codec:,bitrate:,size:,resolution:,framerate:,help -- "$@")"
+eval set -- "$ARGS"
+while true; do
+        case "$1" in
+        -o | --output)
+            output_prefix="$2"
+            shift 2
+            ;;
+        -h | --help)
+            help_text
+            exit 127
+            ;;
+        -O | --stdout)
+            stdout=1
+            shift
+            ;;
+        -I | --stdin)
+            stdin=1
+            shift
+            ;;
+        -p | --pixfmt)
+            pixfmt="$2"
+            shift 2
+            ;;
+        -c | --codec)
+            codec="$2"
+            shift 2
+            ;;
+        -b | --bitrate)
+            bitrate="$2"
+            shift 2
+            ;;
+        -s | --size | --resolution)
+            internal_resolution="$2"
+            shift 2
+            ;;
+        -r | --framerate)
+            internal_framerate="$2"
+            shift 2
+            ;;
+        --)
+            set +o nounset 
+            if [[ -z "$2" ]]
+            then 
+                file_none
+            elif [[ ! -e "$2" ]]
+            then
+                file_notexist "$2"
+            fi
+            set -o nounset
+            filepath="$2"
+            break
+            ;;
+        *)
+            echo How did you get here?
+            exit 1
+            break
+            ;;
+    esac
+done
+
+# ffmpeg -i - -f rawvideo -pix_fmt $pix_fmt - | \
+# ffmpeg -f rawvideo -s $internal_size -pix_fmt $pix_fmt -i - -f nut -c:v $video_codec -b:v $bitrate - |
+# ffmpeg -i - -f rawvideo -pix_fmt $pix_fmt -s $original_size - | \
+# ffmpeg -f rawvideo -s $original_size -pix_fmt $pix_fmt -i - -
+
+original_resolution="$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "$filepath")" 
+
+pixfmt="${pixfmt:-rgb24}"
+internal_resolution="${internal_resolution:-32x32}"
+internal_framerate="${internal_framerate:-30}"
+codec="${codec:-libx264}"
+bitrate="${bitrate:-16k}"
+stdin="${stdin:-0}"
+stdout="${stdout:-0}"
+
+if [[ "$stdin" == 1 ]]
+then
+    input='-'
+else
+    input="$filepath"
+fi
+
+filename="$(basename "$filepath")"
+base_filename="${filename%.*}"
+output_prefix="${output_prefix:-$base_filename}"
+
+if [[ "$stdout" == 1 ]]
+then
+    output_filename='-'
+    output_extension=''
+else
+    output_filename="$output_prefix"-"$pixfmt"-"$codec"-"$bitrate"-"$internal_resolution"-"$internal_framerate"
+    output_extension='.png'
+fi
+
+tmp="$(mktemp)"
+trap 'rm -f "$tmp"' EXIT ERR
+
+wraptonut "$input" - | \
+videotorawvideo - - "$pixfmt" | \
+rawvideotovideo - "$pixfmt" "$internal_resolution" "$internal_framerate" - "$codec" "$bitrate" | \
+videotorawvideo - "$tmp" "$pixfmt"
+tmpsize="$(du --bytes --apparent-size -- "$tmp" | cut -f 1)"
+truncate --size +"$tmpsize" "$tmp"
+rawvideotopng "$tmp" "$pixfmt" "$original_resolution" "$output_filename""$output_extension"
+
+rm "$tmp"
