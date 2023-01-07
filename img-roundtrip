@@ -17,14 +17,16 @@ $(banner)
 $(usage)
 
 Text encased in [] are defaults.
-Options:
+Audio options:
 -a, --channels   audio channels used [1]
 -b, --bitrate    bitrate used [64k]
 -c, --codec      audio codec [libopus]
--p, --pixfmt     pixel format [rgb24]
--o, --output     output prefix [based on filename]
 -r, --rate       sample rate [48000]
 -s, --shift      shift roundtrip audio by n bytes forwards [0]
+Image options:
+-p, --pixfmt     pixel format [rgb24]
+Other options:
+-o, --output     output prefix [based on filename]
 -h, --help       this help
 EOF
 }

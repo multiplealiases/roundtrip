@@ -18,12 +18,14 @@ $(banner)
 $(usage)
 
 Text encased in [] are defaults.
-Options:
+Video options:
 -b, --bitrate       video bitrate [16k]
 -c, --codec         video codec [libx264]
 -p, --pixfmt        pixel format [rgb24]
 -s, --resolution    resolution [32x32]
--M, --no-mulaw      disable mu-law
+Audio options:
+-M, --no-mulaw      disable mu-law companding
+Other options:
 -o, --output        output prefix
 -h, --help          this help
 EOF
