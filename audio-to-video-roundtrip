@@ -36,7 +36,7 @@ EOF
 # 5: sample format
 # convert self-describing audio to a raw sample format
 # input type : audio in NUT
-# output type: raw audios
+# output type: raw audio
 function audiotoraw() {
     ffmpeg -hide_banner -f nut -i "$1" -f "$5" -ac "$4" -ar "$3" -vn "$2"
 }
@@ -58,7 +58,7 @@ function audiotoplayable() {
 # 6: video codec
 # 7: video bitrate
 # converts rawvideo to self-describing video in NUT
-# input type : rawvideo
+# input type : rawvideo [u8 audio]
 # output type: video in NUT
 function rawvideotovideo() {
     ffmpeg -hide_banner -f rawvideo -pix_fmt "$2" -s "$3" -framerate "$4" -i "$1" -c:v "$6" -b:v "$7" -f nut "$5" 
@@ -119,7 +119,7 @@ function mulawcompress() {
 # 6: bitrate
 # 7: codec
 # converts raw data to audio of an arbitrary codec
-# input type: raw (read as $'sample format' audio)
+# input type: $'sample format' audio []
 # output type: self-describing audio in NUT
 function rawtoaudio() {
     ffmpeg -hide_banner -f "$4" -ar "$2" -ac "$3" -i "$1" -b:a "$6" -c:a "$7" -f nut "$5" -y
