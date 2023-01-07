@@ -119,16 +119,14 @@ function mulawcompress() {
 # 6: bitrate
 # 7: codec
 # converts raw data to audio of an arbitrary codec
-# input type: $'sample format' audio []
+# input type: $'sample format' audio [rawvideo]
 # output type: self-describing audio in NUT
 function rawtoaudio() {
     ffmpeg -hide_banner -f "$4" -ar "$2" -ac "$3" -i "$1" -b:a "$6" -c:a "$7" -f nut "$5" -y
 }
 
 function file_notexist() {
-    cat << EOF
-$filepath: does not exist.
-EOF
+    printf '%s : does not exist\n' "$filepath"
     exit 3
 }
 

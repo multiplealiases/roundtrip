@@ -93,9 +93,7 @@ function audioshift() {
 }
 
 function file_notexist() {
-    cat << EOF
-$filepath: does not exist.
-EOF
+    printf '%s : does not exist\n' "$filepath"
     exit 3
 }
 
