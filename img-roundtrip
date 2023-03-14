@@ -16,7 +16,7 @@ function help_text(){
 $(banner)
 $(usage)
 
-Text encased in [] are defaults.
+Defaults shown in [].
 Audio options:
 -a, --channels   audio channels used [1]
 -b, --bitrate    bitrate used [64k]
@@ -74,7 +74,7 @@ function imagetorawvideo() {
     ffmpeg -i "$1" -f rawvideo -pix_fmt "$2" "$3"
 }
 
-# 1: input 
+# 1: input
 # 2: output
 # 3: offset
 # shifts images by n pixels right, wrapping to the left
@@ -131,15 +131,15 @@ while true; do
             ;;
         -s | --shift)
             offset="$2"
-            shift 2 
+            shift 2
             ;;
         -h | --help)
             help_text
             exit 127
             ;;
         --)
-            set +o nounset 
-            if [[ -z "$2" ]]; then 
+            set +o nounset
+            if [[ -z "$2" ]]; then
                 echo "No file was specified."
                 help_text
                 exit 4
@@ -162,8 +162,8 @@ then
 	file_notexist
 fi
 
-resolution="$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "$filepath")" 
-pixfmt="${pixfmt:-rgb24}"  
+resolution="$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "$filepath")"
+pixfmt="${pixfmt:-rgb24}"
 sample_rate="${sample_rate:-48000}"
 offset="${offset:-0}"
 bitrate="${bitrate:-64k}"

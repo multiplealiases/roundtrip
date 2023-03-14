@@ -17,7 +17,7 @@ function help_text(){
 $(banner)
 $(usage)
 
-Text encased in [] are defaults.
+Defaults shown in [].
 Video options:
 -b, --bitrate       video bitrate [16k]
 -c, --codec         video codec [libx264]
@@ -63,7 +63,7 @@ function audiotoplayable() {
 # input type : rawvideo [u8 audio]
 # output type: video in NUT
 function rawvideotovideo() {
-    ffmpeg -hide_banner -f rawvideo -pix_fmt "$2" -s "$3" -framerate "$4" -i "$1" -c:v "$6" -b:v "$7" -f nut "$5" 
+    ffmpeg -hide_banner -f rawvideo -pix_fmt "$2" -s "$3" -framerate "$4" -i "$1" -c:v "$6" -b:v "$7" -f nut "$5"
 }
 
 # 1: input
@@ -89,7 +89,7 @@ function videotorawvideo() {
 # 2: channels
 # 3: sample rate
 # 4: output
-# applies the expand half of the mu-law algorithm 
+# applies the expand half of the mu-law algorithm
 # input type: s32le
 # output type: u8
 function mulawexpand() {
@@ -103,7 +103,7 @@ function mulawexpand() {
 # 2: channels
 # 3: sample rate
 # 4: output
-# applies the compress half of the mu-law algorithm 
+# applies the compress half of the mu-law algorithm
 # input type: u8
 # output type: s32le
 function mulawcompress() {
@@ -166,8 +166,8 @@ while true; do
             shift 2
             ;;
         --)
-            set +o nounset 
-            if [[ -z "$2" ]]; then 
+            set +o nounset
+            if [[ -z "$2" ]]; then
                 echo "No file was specified."
                 help_text
                 exit 4
