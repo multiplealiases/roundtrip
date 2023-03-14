@@ -23,9 +23,6 @@ Video options:
 -p, --pixfmt       pixel format [rgb24]
 -s, --size         resolution [32x32]
 -r, --framerate    framerate [30]
-Input/output options:
--I, --stdin        input is standard input
--O, --stdout       output is standard output
 Other options:
 -o, --output       output prefix (overriden by -O)
 -h, --help         this help
@@ -87,7 +84,7 @@ function wraptonut() {
     ffmpeg -hide_banner -i "$1" -c copy -f nut "$2"
 }
 
-ARGS="$(getopt --options s:,o:,O,I,p:,c:,b:,r:,h --long output:,stdin,stdout,pixfmt:,codec:,bitrate:,size:,resolution:,framerate:,help -- "$@")"
+ARGS="$(getopt --options s:,o:,p:,c:,b:,r:,h --long output:,pixfmt:,codec:,bitrate:,size:,resolution:,framerate:,help -- "$@")"
 eval set -- "$ARGS"
 while true; do
         case "$1" in
@@ -98,14 +95,6 @@ while true; do
         -h | --help)
             help_text
             exit 127
-            ;;
-        -O | --stdout)
-            stdout=1
-            shift
-            ;;
-        -I | --stdin)
-            stdin=1
-            shift
             ;;
         -p | --pixfmt)
             pixfmt="$2"
@@ -163,25 +152,14 @@ bitrate="${bitrate:-16k}"
 stdin="${stdin:-0}"
 stdout="${stdout:-0}"
 
-if [[ "$stdin" == 1 ]]
-then
-    input='-'
-else
-    input="$filepath"
-fi
+input="$filepath"
 
 filename="$(basename "$filepath")"
 base_filename="${filename%.*}"
 output_prefix="${output_prefix:-$base_filename}"
 
-if [[ "$stdout" == 1 ]]
-then
-    output_filename='-'
-    output_extension=''
-else
-    output_filename="$output_prefix"-"$pixfmt"-"$codec"-"$bitrate"-"$internal_resolution"-"$internal_framerate"
-    output_extension='.png'
-fi
+output_filename="$output_prefix"-"$pixfmt"-"$codec"-"$bitrate"-"$internal_resolution"-"$internal_framerate"
+output_extension='.png'
 
 tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT ERR
