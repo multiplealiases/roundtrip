@@ -19,15 +19,15 @@ $(usage)
 
 Defaults shown in [].
 Video options:
--b, --bitrate       video bitrate [16k]
--c, --codec         video codec [libx264]
--p, --pixfmt        pixel format [rgb24]
--s, --resolution    resolution [32x32]
+-b, --bitrate        video bitrate [16k]
+-c, --codec          video codec [libx264]
+-p, --pixfmt         pixel format [rgb24]
+-s, --resolution     resolution [32x32]
 Audio options:
--M, --no-mulaw      disable mu-law companding
+-M, --no-mulaw       disable mu-law companding
 Other options:
--o, --output        output prefix
--h, --help          this help
+-o, --output-prefix  output prefix
+-h, --help           this help
 EOF
 }
 
@@ -132,7 +132,7 @@ function file_notexist() {
     exit 3
 }
 
-ARGS="$(getopt --options h,p:,s:,c:,b:,M,o: --long help,pixfmt:,resolution:,size:,codec:,bitrate:,no-mulaw,output: -- "$@")"
+ARGS="$(getopt --options h,p:,s:,c:,b:,M,o:,O: --long help,pixfmt:,resolution:,size:,codec:,bitrate:,no-mulaw,output:,output-prefix: -- "$@")"
 eval set -- "$ARGS"
 while true; do
         case "$1" in
@@ -140,7 +140,10 @@ while true; do
             help_text
             exit 127
             ;;
-
+       -O | --output)
+           output_name="$2"
+           shift 2
+            ;;
         -p | --pixfmt)
             pixfmt="$2"
             shift 2
@@ -161,7 +164,7 @@ while true; do
             do_mulaw='no'
             shift
             ;;
-        -o | --output)
+        -o | --output-prefix)
             output_prefix="$2"
             shift 2
             ;;
@@ -202,7 +205,8 @@ bitrate="${bitrate:-16k}"
 filename="$(basename "$filepath")"
 base_filename="${filename%.*}"
 output_prefix="${output_prefix:-$base_filename}"
-output_filename="$output_prefix"-"$pixfmt"-"$codec"-"$bitrate"-"$resolution"-"$do_mulaw"
+default_name="$output_prefix"-"$pixfmt"-"$codec"-"$bitrate"-"$resolution"-"$do_mulaw"
+output_filename="${output_name:-$default_name}"
 
 if [[ "$do_mulaw" == "yes" ]]
 then
