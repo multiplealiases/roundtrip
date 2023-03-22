@@ -1,0 +1,214 @@
+#!/usr/bin/env bash
+
+set -o nounset
+set -o errexit
+
+function banner() {
+    echo Apply audio generation loss to images
+}
+
+function usage() {
+    echo Usage: image-to-audio-genloss \[options\] filename
+}
+
+
+function help_text(){
+    cat << EOF
+$(banner)
+$(usage)
+
+Defaults shown in [].
+-b, --bitrates       space-separated string of bitrates ['96k 160k']
+-c, --codecs         space-separated string of codecs ['libvorbis libopus']
+-r, --rate           sample rate during genloss [48000]
+-p, --pixfmt         pixel format during genloss [yuv444p]
+-n, --iterations     number of iterations to perform [500]
+-o, --output         output name
+
+Concatenate options:
+-m, --mode           concatenation mode
+                     available: temporal spatial-horizontal spatial-vertical none
+-f, --framerate      framerate of output video in 'temporal' mode
+EOF
+}
+
+function file_notexist(){
+    printf ''\''%s'\'': file does not exist\n' "$1"
+    exit 1
+}
+
+function file_exist(){
+    printf ''\''%s'\'': file exists\n' "$1"
+    exit 6
+}
+
+function file_none(){
+    echo No file was specified.
+    help_text
+    exit 4
+}
+
+function cleanup(){
+    rm -r "$tmpaudio" "$tmpimage"
+}
+
+function verify_mode(){
+
+if [[ -z ${mode+x} ]]
+then
+    cat << EOF
+No mode was given. Valid options are:
+temporal spatial-horizontal spatial-vertical none
+EOF
+exit 6
+fi
+
+case "$mode" in
+    spatial-horizontal | spatial-vertical)
+        if [[ -n $framerate ]]; then
+            echo '-f cannot be set in spatial concatenation mode'
+            exit 8
+        else
+            return 0
+        fi
+        ;;
+    temporal | none)
+        return 0
+        ;;
+    *)
+        printf 'mode %s does not exist' "$mode"
+        exit 7
+        ;;
+    esac
+}
+
+ARGS="$(getopt --options h,r:,p:,n:,b:,c:,m:,f:,o: --long help,rate:,pixfmt:,iterations:,bitrates:,codecs:,mode:,framerate:,output: -- "$@")"
+eval set -- "$ARGS"
+while true
+do
+    case "$1" in
+    -h | --help)
+        help_text
+        exit 5
+        ;;
+    -r | --rate)
+        rate="$2"
+        shift 2
+        ;;
+    -p | --pixfmt)
+        pixfmt="$2"
+        shift 2
+        ;;
+    -n | --iterations)
+        end="$2"
+        shift 2
+        ;;
+    -b | --bitrates)
+        bitrates="$2"
+        shift 2
+        ;;
+    -c | --codecs)
+        codecs="$2"
+        shift 2
+        ;;
+    -m | --mode)
+        mode="$2"
+        shift 2
+        ;;
+    -f | --framerate)
+        framerate="$2"
+        shift 2
+        ;;
+    -o | --output)
+        output="$2"
+        shift 2
+        ;;
+    --)
+        set +o nounset
+        if [[ -z "$2" ]]
+        then
+            file_none
+        elif [[ ! -e "$2" ]]
+        then
+            file_notexist "$2"
+        fi
+        set -o nounset
+        filepath="$2"
+        break
+        ;;
+    *)
+        printf 'How did you get here? The last args I saw were \n%s\n' "$@"
+        exit 1
+        break
+        ;;
+    esac
+done
+
+verify_mode
+
+original_res="$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "$filepath")"
+codecs="${codecs:-libvorbis libopus}"
+bitrates="${bitrates:-96k 160k}"
+pixfmt="${pixfmt:-yuv444p}"
+framerate="${framerate:-25}"
+rate="${rate:-48000}"
+end="${end:-500}"
+
+filename="$(basename "$filepath")"
+base_filename="${filename%.*}"
+output="${output:-$base_filename}"
+default_name="$output"-"$pixfmt"-"$rate"-"$codecs"-"$bitrates"
+output_name="${output_name:-$default_name}"
+
+tmpaudio="$(mktemp -d)"
+tmpimage="$(mktemp -d)"
+
+trap 'cleanup' ERR EXIT
+
+ffmpeg -hide_banner -loglevel quiet -i "$filepath" -f rawvideo -pix_fmt "$pixfmt" -an - | \
+ffmpeg -hide_banner -loglevel quiet -f u8 -ar "$rate" -i - -c:a flac "$tmpaudio"/0.nut
+
+[[ -f "$output_name".list ]] && file_exist "$output_name"
+
+for i in $(seq 1 "$end")
+do
+    # shellcheck disable=SC2086
+    codec="$(shuf --echo -n1 $codecs)"
+    # shellcheck disable=SC2086
+    bitrate="$(shuf --echo -n1 $bitrates)"
+    printf 'iteration %s: %s at %s\n' "$i" "$codec" "$bitrate" | tee -a "$output_name".list
+    ffmpeg -hide_banner -loglevel quiet -i "$tmpaudio"/"$((i - 1))".nut \
+    -c:a "$codec" -b:a "$bitrate" "$tmpaudio"/"$i".nut
+
+    ffmpeg -hide_banner -loglevel quiet -i "$tmpaudio"/"$i".nut -f u8 - | \
+    ffmpeg -hide_banner -loglevel quiet -f rawvideo -pix_fmt "$pixfmt" -s "$original_res" -i - \
+    "$tmpimage"/"$i".png
+done
+
+case "$mode" in
+    none)
+    mv --no-clobber "$tmpimage" "$output_name" || file_exist "$output_name"
+    ;;
+    temporal)
+        ffmpeg -hide_banner -loglevel quiet -i "$tmpimage"/%d.png -c:v ffv1 "$output_name".mkv -n ||
+        file_exist "$output_name".mkv
+    ;;
+    spatial-vertical)
+        find "$tmpimage" -type f | sort > "$tmpimage"/list
+        [[ -f "$output_name".png ]] && file_exist "$output_name".png
+        convert -append @"$tmpimage"/list "$output_name".png
+    ;;
+    spatial-horizontal)
+        find "$tmpimage" -type f | sort > "$tmpimage"/list
+        [[ -f "$output_name".png ]] && file_exist "$output_name".png
+        convert +append @"$tmpimage"/list "$output_name".png
+    ;;
+    *)
+        cat << EOF
+How did you get past the mode check?
+I read:
+$mode
+but I do not know what to do with this info.
+Giving up.
+EOF
+esac
