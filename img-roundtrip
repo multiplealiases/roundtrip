@@ -18,16 +18,17 @@ $(usage)
 
 Defaults shown in [].
 Audio options:
--a, --channels   audio channels used [1]
--b, --bitrate    bitrate used [64k]
--c, --codec      audio codec [libopus]
--r, --rate       sample rate [48000]
--s, --shift      shift roundtrip audio by n bytes forwards [0]
+-a, --channels     audio channels used [1]
+-b, --bitrate      bitrate used [64k]
+-c, --codec        audio codec [libopus]
+-r, --rate         sample rate [48000]
+-s, --shift        shift roundtrip audio by n bytes forwards [0]
+-f, --filtergraph  path to filtergraph
 Image options:
--p, --pixfmt     pixel format [rgb24]
+-p, --pixfmt       pixel format [rgb24]
 Other options:
--o, --output     output prefix [based on filename]
--h, --help       this help
+-o, --output       output prefix [based on filename]
+-h, --help         this help
 EOF
 }
 
@@ -95,13 +96,20 @@ function audioshift() {
     ffmpeg -i "$1" -c:a pcm_s24le -f nut -af adelay=delays="$3"S:all=1 "$2"
 }
 
+# 1: input
+# 2: output
+# 3: path to filtergraph
+function audiofilter() {
+    ffmpeg -f nut -i "$1" -c:a pcm_s24le -filter_complex_script "$3" -f nut "$2"
+}
+
 function file_notexist() {
     printf '%s : does not exist\n' "$filepath"
     exit 3
 }
 
 
-ARGS="$(getopt --options a:,b:,c:,p:,o:,r:,s:,h --long channels:,bitrate:,codec:,pixfmt,output:,rate:,shift:,help -- "$@")"
+ARGS="$(getopt --options a:,b:,c:,p:,o:,r:,s:,f:,h --long channels:,bitrate:,codec:,pixfmt,output:,rate:,shift:,filtergraph:,help -- "$@")"
 eval set -- "$ARGS"
 while true; do
         case "$1" in
@@ -133,6 +141,10 @@ while true; do
             offset="$2"
             shift 2
             ;;
+        -f | --filtergraph)
+            filtergraph="$2"
+            shift 2
+            ;;
         -h | --help)
             help_text
             exit 127
@@ -156,11 +168,28 @@ while true; do
     esac
 done
 
+cleanup_array="$(mktemp)"
+function cleanup() {
+    < "$cleanup_array" xargs -0 -I{} rm -rf {}
+    rm -f "$cleanup_array"
+}
+
+function append_mktemp() {
+    tmp="$(mktemp "$@")"
+    printf "%s\0" "$tmp" >> "$cleanup_array"
+    printf "%s\n" "$tmp"
+}
+trap 'cleanup' ERR EXIT
 
 if [[ ! (-e "$filepath") ]] # if the file does not exist
 then
 	file_notexist
 fi
+
+anull=$(append_mktemp)
+cat << EOF > "$anull"
+anull
+EOF
 
 resolution="$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "$filepath")"
 pixfmt="${pixfmt:-rgb24}"
@@ -169,6 +198,7 @@ offset="${offset:-0}"
 bitrate="${bitrate:-64k}"
 codec="${codec:-libopus}"
 channels="${channels:-1}"
+filtergraph="${filtergraph:-$anull}"
 
 filename="$(basename "$filepath")"
 base_filename="${filename%.*}"
@@ -177,7 +207,7 @@ output_filename="$output_prefix"-"$pixfmt"-"$sample_rate"-"$channels"-"$codec"-"
 
 imagetorawvideo "$filepath" "$pixfmt" '-' | \
 u8toaudio '-' "$sample_rate" "$channels" '-' "$bitrate" "$codec" | \
+audiofilter '-' '-' "$filtergraph" |
 audioshift '-' '-' "$offset" | \
 audiotou8 '-' '-' "$sample_rate" "$channels" | \
 u8toimage '-' "$pixfmt" "$resolution" "$output_filename".png
-
