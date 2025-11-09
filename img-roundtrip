@@ -39,7 +39,7 @@ EOF
 # input: audio in NUT
 # output: u8 audio
 function audiotou8() {
-    ffmpeg -f nut -i "$1" -f u8 -ac "$4" -ar "$3" "$2"
+    ffmpeg -f matroska -i "$1" -f u8 -ac "$4" -ar "$3" "$2"
 }
 
 # 1: input
@@ -51,7 +51,7 @@ function audiotou8() {
 # input: u8 audio [rawvideo]
 # output: audio in NUT
 function u8toaudio() {
-    ffmpeg -f u8 -ar "$2" -ac "$3" -i "$1" -b:a "$5" -c:a "$6" -f nut "$4"
+    ffmpeg -f u8 -ar "$2" -ac "$3" -i "$1" -b:a "$5" -c:a "$6" -f matroska "$4"
 }
 
 # 1: input
@@ -93,14 +93,14 @@ function imageshift() {
 # input: self-describing audio [u8 representing rawvideo]
 # output: self-describing audio [u8 representing rawvideo]
 function audioshift() {
-    ffmpeg -i "$1" -c:a pcm_s24le -f nut -af adelay=delays="$3"S:all=1 "$2"
+    ffmpeg -i "$1" -c:a pcm_s24le -f matroska -af adelay=delays="$3"S:all=1 "$2"
 }
 
 # 1: input
 # 2: output
 # 3: path to filtergraph
 function audiofilter() {
-    ffmpeg -f nut -i "$1" -c:a pcm_s24le -filter_complex_script "$3" -f nut "$2"
+    ffmpeg -f matroska -i "$1" -c:a pcm_s24le -filter_complex_script "$3" -f nut "$2"
 }
 
 function file_notexist() {
@@ -192,6 +192,10 @@ anull
 EOF
 
 resolution="$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=s=x:p=0 "$filepath")"
+width="$(echo "$resolution" | cut -f 1 -dx)"
+height="$(echo "$resolution" | cut -f 2 -dx)"
+height="$(( height - 2 ))"
+resolution="$width"x"$height"
 pixfmt="${pixfmt:-rgb24}"
 sample_rate="${sample_rate:-48000}"
 offset="${offset:-0}"
